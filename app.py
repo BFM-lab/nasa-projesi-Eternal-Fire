@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import math
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -134,6 +135,85 @@ def find_target_image(region_key: str, target: dict) -> str:
     return ""
 
 
+# 3D ROKET MODELİ
+def build_3d_rocket(lx: float, ly: float, lz: float, h_m: float = 38.0, r_m: float = 1.8):
+    lines_x, lines_y, lines_z = [], [], []
+    angles = [0, math.pi / 2, math.pi, 3 * math.pi / 2]
+    tip_z = lz + h_m
+    shoulder_z = lz + h_m * 0.72
+    base_z = lz + h_m * 0.18
+
+    for a in angles:
+        bx = lx + r_m * math.cos(a)
+        by = ly + r_m * math.sin(a)
+        leg_x = lx + (r_m * 2.6) * math.cos(a)
+        leg_y = ly + (r_m * 2.6) * math.sin(a)
+        lines_x.extend([bx, leg_x, None])
+        lines_y.extend([by, leg_y, None])
+        lines_z.extend([base_z, lz, None])
+        lines_x.extend([bx, bx, lx, None])
+        lines_y.extend([by, by, ly, None])
+        lines_z.extend([base_z, shoulder_z, tip_z, None])
+
+    for z_ring in [base_z, shoulder_z]:
+        ring_pts = 16
+        for i in range(ring_pts + 1):
+            theta = 2 * math.pi * (i / ring_pts)
+            lines_x.append(lx + r_m * math.cos(theta))
+            lines_y.append(ly + r_m * math.sin(theta))
+            lines_z.append(z_ring)
+        lines_x.append(None); lines_y.append(None); lines_z.append(None)
+
+    return go.Scatter3d(
+        x=lines_x, y=lines_y, z=lines_z,
+        mode="lines",
+        line=dict(color="#00f5d4", width=5),
+        name="3D Roket (Lander)",
+        hoverinfo="name",
+    )
+
+
+# 3D ASTRONOT MODELİ
+def build_3d_astronaut(ax: float, ay: float, az: float, h_m: float = 24.0):
+    lines_x, lines_y, lines_z = [], [], []
+    head_z = az + h_m * 0.88
+    neck_z = az + h_m * 0.75
+    pelvis_z = az + h_m * 0.42
+    w_m = 1.1
+
+    lines_x.extend([ax - w_m, ax, ax + w_m, None])
+    lines_y.extend([ay, ay, ay, None])
+    lines_z.extend([az, pelvis_z, az, None])
+
+    lines_x.extend([ax, ax, None])
+    lines_y.extend([ay, ay, None])
+    lines_z.extend([pelvis_z, neck_z, None])
+
+    lines_x.extend([ax - w_m * 1.3, ax, ax + w_m * 1.3, None])
+    lines_y.extend([ay, ay, ay, None])
+    lines_z.extend([az + h_m * 0.48, neck_z, az + h_m * 0.60, None])
+
+    lines_x.extend([ax, ax, None])
+    lines_y.extend([ay - w_m * 0.8, ay - w_m * 0.8, None])
+    lines_z.extend([pelvis_z + h_m * 0.08, neck_z - h_m * 0.05, None])
+
+    trace_body = go.Scatter3d(
+        x=lines_x, y=lines_y, z=lines_z,
+        mode="lines",
+        line=dict(color="#ffffff", width=6),
+        name="3D Astronot",
+        hoverinfo="name",
+    )
+    trace_head = go.Scatter3d(
+        x=[ax], y=[ay], z=[head_z],
+        mode="markers",
+        marker=dict(size=6, color="#fee440", symbol="circle"),
+        name="Astronot Kaskı",
+        hoverinfo="name",
+    )
+    return trace_body, trace_head
+
+
 def build_survival_guide_markdown(
     region_name: str,
     profile_name: str,
@@ -184,9 +264,12 @@ def build_survival_guide_markdown(
     return "\n".join(lines)
 
 
+# ==========================================================
+# BAŞLATMA
+# ==========================================================
 sites_meta = load_sites_meta()
 if not sites_meta:
-    st.error("`processed/sites.json` bulunamadı! Önce `.venv\\Scripts\\python.exe data_prep.py` çalıştırın.")
+    st.error("`processed/sites.json` bulunamadı! Önce `python data_prep.py` çalıştırın.")
     st.stop()
 
 st.markdown("""
@@ -222,16 +305,55 @@ with st.sidebar:
     else:
         lander_xy = tuple(meta["lander"])
 
+    # YENİ VE KOLAYLAŞTIRILMIŞ HEDEF SEÇİMİ
+    st.header("🎯 Hedef Belirleme")
     target_options = {t["id"]: t for t in meta["targets"]}
-    target_mode = st.radio("Hedef Seçimi", ["Bilimsel Hedefler", "Özel Koordinat"], horizontal=True)
-    if target_mode == "Bilimsel Hedefler":
+    target_mode = st.radio(
+        "Hedef Belirleme Yöntemi",
+        ["🔬 Bilimsel Hedefler", "🧭 Pusula (Yön & Mesafe)", "🎯 Hassas Koordinat (X, Y)"],
+    )
+
+    if target_mode == "🔬 Bilimsel Hedefler":
         sel_tid = st.selectbox(
-            "Hedef Noktası",
+            "Hazır Bilimsel Hedef",
             list(target_options.keys()),
             format_func=lambda tid: f"{tid}: {target_options[tid]['name']}",
         )
         sel_target = target_options[sel_tid]
         target_xy = (int(sel_target["x"]), int(sel_target["y"]))
+
+    elif target_mode == "🧭 Pusula (Yön & Mesafe)":
+        st.caption("Roketten gitmek istediğiniz yönü ve mesafeyi seçin:")
+        compass_dir = st.selectbox(
+            "Keşif Yönü",
+            [
+                "Kuzey (N)", "Kuzeydoğu (NE)", "Doğu (E)", "Güneydoğu (SE)",
+                "Güney (S)", "Güneybatı (SW)", "Batı (W)", "Kuzeybatı (NW)",
+            ],
+            index=1,
+        )
+        dist_m_choice = st.slider("Roketten Mesafe (m)", 300, 1800, 900, step=100)
+
+        dir_angles = {
+            "Kuzey (N)": 90, "Kuzeydoğu (NE)": 45, "Doğu (E)": 0, "Güneydoğu (SE)": 315,
+            "Güney (S)": 270, "Güneybatı (SW)": 225, "Batı (W)": 180, "Kuzeybatı (NW)": 135,
+        }
+        rad = math.radians(dir_angles[compass_dir])
+        dx_cells = (dist_m_choice / cell_m) * math.cos(rad)
+        dy_cells = (dist_m_choice / cell_m) * math.sin(rad)
+
+        calc_tx = int(np.clip(round(lander_xy[0] + dx_cells), 5, grid_n - 6))
+        calc_ty = int(np.clip(round(lander_xy[1] + dy_cells), 5, grid_n - 6))
+        target_xy = (calc_tx, calc_ty)
+
+        sel_target = {
+            "id": "PUSULA",
+            "name": f"{compass_dir} Keşfi ({dist_m_choice} m)",
+            "description": f"Roketten {compass_dir} yönünde yaklaşık {dist_m_choice} metre uzaklıktaki taktik keşif hedefi.",
+            "image_path": "",
+        }
+        st.info(f"Hesaplanan Hedef: **({calc_tx}, {calc_ty})**")
+
     else:
         c_tx, c_ty = st.columns(2)
         tx = c_tx.number_input("Hedef X", 0, grid_n - 1, int(meta["targets"][0]["x"]))
@@ -244,6 +366,7 @@ with st.sidebar:
             "image_path": "",
         }
 
+    st.header("⚙️ Çevre & Astronot")
     profile_name = st.selectbox("Astronot / Ekipman Profili", list(MOBILITY_PROFILES.keys()))
     default_temp_lim = int(MOBILITY_PROFILES[profile_name]["min_temp_c"])
 
@@ -264,6 +387,7 @@ with st.sidebar:
         thermal_w = st.slider("Termal Koruma Ağırlığı", 0.0, 5.0, 2.0, step=0.5)
         rad_w = st.slider("Radyasyon Koruma Ağırlığı", 0.0, 5.0, 1.5, step=0.5)
 
+# ROTA HESAPLAMASI
 out_model, ret_model, path_out, err_out, path_ret, err_ret, naive_out = compute_mission_routes(
     region_key, cell_m, lander_xy, target_xy, max_slope, max_crater,
     min_temp_limit, out_hour, ret_hour, solar_storm, thermal_w, rad_w, profile_name
@@ -281,7 +405,7 @@ if err_out or err_ret:
     )
     msg_parts = []
     if alt_suggestions.get("thermal_block"):
-        msg_parts.append("• **Aşırı Soğuk Engeli:** Seçilen Sol saatinde başlangıç veya hedef giysi sınırının altında. Daha sıcak bir saate (**10:00–16:00**) geçin veya *Rover Destekli* profili seçin.")
+        msg_parts.append("• **Aşırı Soğuk Engeli:** Seçilen saatte sıcaklık giysi sınırının altında. Daha sıcak bir saate (**10:00–16:00**) geçin veya *Rover Destekli* profili seçin.")
     if "nearest_safe_start" in alt_suggestions:
         msg_parts.append(f"• Roket için en yakın güvenli iniş noktası: **{alt_suggestions['nearest_safe_start']}**")
     if "nearest_reachable_pt" in alt_suggestions:
@@ -315,6 +439,9 @@ else:
     out_steps = extract_turn_by_turn_steps(path_out, cell_m, out_model["temp_map"], layers["slope_deg"])
     ret_steps = extract_turn_by_turn_steps(path_ret, cell_m, ret_model["temp_map"], layers["slope_deg"])
 
+# ==========================================================
+# ANA HARİTA VE HUD SÜTUNLARI
+# ==========================================================
 col_map, col_hud = st.columns([2.15, 1.0], gap="medium")
 
 with col_map:
@@ -379,25 +506,26 @@ with col_map:
                 x=[p[0] for p in alt_p], y=[p[1] for p in alt_p],
                 mode="lines", name="Alternatif Yaklaşım", line=dict(color="#c77dff", width=3, dash="dashdot"),
             ))
+
+        # 2D ROKET
         fig.add_trace(go.Scatter(
-            x=[lander_xy[0]], y=[lander_xy[1]], mode="markers+text", text=["🚀 Roket"], textposition="top center",
-            textfont=dict(color="#ffffff", size=12),
-            marker=dict(size=14, color="#22c55e", symbol="triangle-up", line=dict(color="black", width=1.5)),
-            name="Roket",
+            x=[lander_xy[0]], y=[lander_xy[1]], mode="text", text=["🚀"],
+            textfont=dict(size=30), name="Roket",
         ))
+
+        # 2D HEDEFLER
         for tid, tinfo in target_options.items():
             fig.add_trace(go.Scatter(
-                x=[tinfo["x"]], y=[tinfo["y"]], mode="markers+text", text=[tid], textposition="bottom center",
-                textfont=dict(color="#ffffff", size=12),
-                marker=dict(size=11, color="#f43f5e", symbol="diamond", line=dict(color="white", width=1.5)),
-                name=f"{tid}",
+                x=[tinfo["x"]], y=[tinfo["y"]], mode="text", text=["🔬"],
+                textfont=dict(size=22), name=f"{tid}",
             ))
-        if target_mode != "Bilimsel Hedefler":
-            fig.add_trace(go.Scatter(
-                x=[target_xy[0]], y=[target_xy[1]], mode="markers+text", text=["🎯 Hedef"], textposition="top center",
-                textfont=dict(color="#ffffff", size=12),
-                marker=dict(size=14, color="#f43f5e", symbol="star"), name="Özel Hedef",
-            ))
+
+        # Seçili Aktif Hedef / Astronot Yeri
+        fig.add_trace(go.Scatter(
+            x=[target_xy[0]], y=[target_xy[1]], mode="text", text=["👨‍🚀"],
+            textfont=dict(size=30), name="Astronot Hedefi",
+        ))
+
         fig.update_layout(
             height=680,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -406,7 +534,9 @@ with col_map:
             legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0, font=dict(size=11)),
             margin=dict(l=10, r=10, t=35, b=10),
         )
+
     else:
+        # 3D GÖRÜNÜM
         elev = layers["elevation"]
         coords_sub = np.arange(0, grid_n, 2)
         fig.add_trace(go.Surface(
@@ -440,20 +570,36 @@ with col_map:
                 z=[float(elev[p[1], p[0]]) + 4.5 for p in alt_p],
                 mode="lines", name="Alternatif", line=dict(color="#c77dff", width=6, dash="dashdot"),
             ))
+
+        # 3D ROKET
+        lz = float(elev[lander_xy[1], lander_xy[0]])
+        fig.add_trace(build_3d_rocket(lander_xy[0], lander_xy[1], lz, h_m=38.0, r_m=2.0))
         fig.add_trace(go.Scatter3d(
-            x=[lander_xy[0]], y=[lander_xy[1]], z=[float(elev[lander_xy[1], lander_xy[0]]) + 9.0],
-            mode="markers+text", text=["🚀 Roket"], textposition="top center",
-            textfont=dict(color="#00f5d4", size=13), marker=dict(size=7, color="#22c55e", symbol="diamond"),
-            name="Roket",
+            x=[lander_xy[0]], y=[lander_xy[1]], z=[lz + 44.0],
+            mode="text", text=["🚀 ROKET"], textfont=dict(color="#00f5d4", size=14),
+            name="Roket", hoverinfo="skip",
         ))
+
+        # 3D ASTRONOT
+        tz = float(elev[target_xy[1], target_xy[0]])
+        ast_body, ast_head = build_3d_astronaut(target_xy[0], target_xy[1], tz, h_m=26.0)
+        fig.add_trace(ast_body)
+        fig.add_trace(ast_head)
+        fig.add_trace(go.Scatter3d(
+            x=[target_xy[0]], y=[target_xy[1]], z=[tz + 32.0],
+            mode="text", text=["👨‍🚀 ASTRONOT"], textfont=dict(color="#fee440", size=14),
+            name="Astronot", hoverinfo="skip",
+        ))
+
         for tid, tinfo in target_options.items():
             tx_i, ty_i = int(tinfo["x"]), int(tinfo["y"])
             fig.add_trace(go.Scatter3d(
                 x=[tx_i], y=[ty_i], z=[float(elev[ty_i, tx_i]) + 9.0],
                 mode="markers+text", text=[tid], textposition="top center",
-                textfont=dict(color="#ff2a85", size=13), marker=dict(size=6, color="#ff2a85", symbol="diamond"),
+                textfont=dict(color="#ff2a85", size=12), marker=dict(size=6, color="#ff2a85", symbol="diamond"),
                 name=tid,
             ))
+
         fig.update_layout(
             height=680,
             dragmode="turntable",
@@ -470,6 +616,7 @@ with col_map:
             margin=dict(l=5, r=5, t=35, b=5),
         )
 
+    # STANDART VE HIZLI ÇİZİM (Seçim kasmaları kaldırıldı)
     st.plotly_chart(fig, use_container_width=True)
 
 with col_hud:
@@ -498,6 +645,9 @@ with col_hud:
     else:
         st.markdown('<div class="hud-card"><div class="hud-title">⚠️ ROTA BEKLEMEDE</div>Güvenli geçiş için soldan Sol saatini/koordinatı değiştirin veya Gelişmiş Ayarlardan limitleri gevşetin.</div>', unsafe_allow_html=True)
 
+# ==========================================================
+# ALT SEKMELER
+# ==========================================================
 tab1, tab2, tab3 = st.tabs([
     "📊 Rota Telemetrisi & Karşılaştırma",
     "🧭 Detaylı Hayatta Kalma Kılavuzu & Fotoğraf",
@@ -552,7 +702,7 @@ with tab2:
         "slope": float(layers["slope_deg"][ty, tx]),
         "depth": float(layers["crater_depth_m"][ty, tx]),
         "temp": float(out_model["temp_map"][ty, tx]),
-        "rad": float(out_model["rad_map"][ty, tx]),
+        "rad": float(layers["radiation"][ty, tx]),
     }
 
     col_g1, col_g2 = st.columns([3, 2])
@@ -560,11 +710,7 @@ with tab2:
         st.subheader(f"Hedef Brifingi: {sel_target['name']}")
         st.write(sel_target["description"])
         st.write(
-            f"**Hedef Koşulları:** Yükseklik `{target_stats['elev']:.1f} m` | "
-            f"Eğim `{target_stats['slope']:.1f}°` | "
-            f"Krater Derinliği `{target_stats['depth']:.1f} m` | "
-            f"Sıcaklık `{target_stats['temp']:.1f} °C` | "
-            f"Radyasyon `{target_stats['rad']:.2f} mSv/gün`"
+            f"**Hedef Koşulları:** Yükseklik `{target_stats['elev']:.1f} m` | Eğim `{target_stats['slope']:.1f}°` | Krater Derinliği `{target_stats['depth']:.1f} m` | Sıcaklık `{target_stats['temp']:.1f} °C` | Radyasyon `{target_stats['rad']:.2f} mSv/gün`"
         )
 
         if mission_summary and mission_summary["min_temp"] < -55.0:
@@ -600,6 +746,6 @@ with tab3:
     st.markdown(f"""
     ### Veri Kaynakları ve Mühendislik Modeli ({meta['display_name']})
     1. **Topografya / Krater / Eğim (Ham NASA Verisi):** Doğrudan NASA JPL Mars Trek 3D DEM yüzey ağından (`.stl`, `{grid_n}×{grid_n}` grid, `1 br = {cell_m:.0f} m`) gerçek XY/Z oranı korunarak çıkarılmıştır.
-    2. **Saatlik Termal Katman (NASA REMS / MEDA Hibrit Modeli):** Curiosity REMS (Gale) ve Perseverance MEDA (Jezero) 24 saatlik yüzey sıcaklık eğrisi temel alınarak, seçilen Sol saatindeki güneş azimut/yükseklik açısına göre dinamik gölgelenme (`hillshade`) ve krater içi soğuk hava birikimiyle hesaplanmıştır.
+    2. **Saatlik Termal Katman (NASA REMS/MEDA Hibrit Modeli):** Curiosity REMS (Gale) ve Perseverance MEDA (Jezero) 24 saatlik yüzey sıcaklık eğrisi temel alınarak, seçilen Sol saatindeki güneş azimut/yükseklik açısına göre dinamik gölgelenme (`hillshade`) ve krater içi soğuk hava birikimiyle hesaplanmıştır.
     3. **Radyasyon Katmanı (NASA RAD Modeli):** Curiosity RAD (~0.64 mSv/gün) gerçek yüzey radyasyonu temel alınarak topografik gökyüzü açıklığına göre modellenmiştir.
     """)
