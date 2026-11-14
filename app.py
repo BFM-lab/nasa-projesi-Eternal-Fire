@@ -28,6 +28,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+/* GENEL MASAÜSTÜ STİLLERİ */
 .hud-banner {
     background: linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.85) 60%, rgba(255,107,53,0.18) 100%);
     border: 1px solid rgba(0, 245, 212, 0.3);
@@ -61,6 +62,43 @@ st.markdown("""
 }
 .step-box-ret {
     border-left-color: #fee440;
+}
+
+/* ========================================================
+   📱 TELEFON & MOBİL UYUM (RESPONSIVE)
+   ======================================================== */
+@media (max-width: 768px) {
+    /* Mobilde harita boyunu küçült (kullanıcı aşağı kaydırabilsin) */
+    .js-plotly-plot, .plotly, .plot-container {
+        height: 380px !important;
+        max-height: 380px !important;
+    }
+    
+    /* Üst başlığı mobilde daha kompakt yap */
+    .hud-banner {
+        padding: 10px 12px !important;
+    }
+    .hud-banner h2 {
+        font-size: 1.1rem !important;
+    }
+    .hud-banner p {
+        font-size: 0.78rem !important;
+    }
+    
+    /* Kartların mobilde taşmasını engelle */
+    .hud-card {
+        padding: 8px 10px !important;
+        margin-bottom: 8px !important;
+    }
+    .step-box {
+        font-size: 0.78rem !important;
+        padding: 5px 8px !important;
+    }
+    
+    /* Metrik fontlarını mobilde toparla */
+    div[data-testid="stMetricValue"] {
+        font-size: 1.3rem !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
