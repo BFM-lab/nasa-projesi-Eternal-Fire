@@ -28,7 +28,6 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* GENEL MASAÜSTÜ STİLLERİ */
 .hud-banner {
     background: linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.85) 60%, rgba(255,107,53,0.18) 100%);
     border: 1px solid rgba(0, 245, 212, 0.3);
@@ -63,41 +62,21 @@ st.markdown("""
 .step-box-ret {
     border-left-color: #fee440;
 }
-
-/* ========================================================
-   📱 TELEFON & MOBİL UYUM (RESPONSIVE)
-   ======================================================== */
 @media (max-width: 768px) {
-    /* Mobilde harita boyunu küçült (kullanıcı aşağı kaydırabilsin) */
-    .js-plotly-plot, .plotly, .plot-container {
-        height: 380px !important;
-        max-height: 380px !important;
-    }
-    
-    /* Üst başlığı mobilde daha kompakt yap */
     .hud-banner {
         padding: 10px 12px !important;
     }
     .hud-banner h2 {
-        font-size: 1.1rem !important;
+        font-size: 1.15rem !important;
     }
     .hud-banner p {
-        font-size: 0.78rem !important;
+        font-size: 0.80rem !important;
     }
-    
-    /* Kartların mobilde taşmasını engelle */
     .hud-card {
-        padding: 8px 10px !important;
-        margin-bottom: 8px !important;
+        padding: 9px 11px !important;
     }
-    .step-box {
-        font-size: 0.78rem !important;
-        padding: 5px 8px !important;
-    }
-    
-    /* Metrik fontlarını mobilde toparla */
     div[data-testid="stMetricValue"] {
-        font-size: 1.3rem !important;
+        font-size: 1.35rem !important;
     }
 }
 </style>
@@ -468,6 +447,13 @@ with st.sidebar:
         thermal_w = st.slider("Thermal Weight" if is_en else "Termal Koruma Ağırlığı", 0.0, 5.0, 2.0, step=0.5)
         rad_w = st.slider("Radiation Weight" if is_en else "Radyasyon Koruma Ağırlığı", 0.0, 5.0, 1.5, step=0.5)
 
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        "💡 **System Tip:** For optimal 3D terrain rendering and full HUD telemetry, **Desktop Wide Mode** is recommended."
+        if is_en else
+        "💡 **Sistem Performans İpucu:** En akıcı 3B arazi deneyimi ve geniş telemetri görünümü için masaüstü tarayıcıda **Geniş Mod (Wide Mode)** önerilir."
+    )
+
 # BANNER
 banner_title = "🚀 MARS EVA MISSION CONTROL & SURVIVAL GUIDE" if is_en else "🚀 MARS EVA GÖREV KONTROLÜ & HAYATTA KALMA KILAVUZU"
 banner_sub = (
@@ -620,20 +606,18 @@ with col_map:
             textfont=dict(size=30), name=("Lander" if is_en else "Roket"),
         ))
 
-       
-
         fig.add_trace(go.Scatter(
             x=[target_xy[0]], y=[target_xy[1]], mode="text", text=["👨‍🚀"],
             textfont=dict(size=30), name=("Target Waypoint" if is_en else "Astronot Hedefi"),
         ))
 
         fig.update_layout(
-            height=680,
+            height=480,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(title=f"X (1 px = {cell_m:.0f} m)", constrain="domain"),
-            yaxis=dict(title=f"Y (1 px = {cell_m:.0f} m)", scaleanchor="x", scaleratio=1),
-            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0, font=dict(size=11)),
-            margin=dict(l=10, r=10, t=35, b=10),
+            xaxis=dict(title=f"X ({cell_m:.0f}m)", constrain="domain", fixedrange=True),
+            yaxis=dict(title=f"Y ({cell_m:.0f}m)", scaleanchor="x", scaleratio=1, fixedrange=True),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=10)),
+            margin=dict(l=0, r=0, t=30, b=10),
         )
 
     else:
@@ -689,9 +673,8 @@ with col_map:
             name="Astronaut", hoverinfo="skip",
         ))
 
-        
         fig.update_layout(
-            height=680,
+            height=620,
             dragmode="turntable",
             paper_bgcolor="rgba(0,0,0,0)",
             scene=dict(
@@ -707,14 +690,14 @@ with col_map:
         )
 
     st.plotly_chart(
-    fig,
-    use_container_width=True,
-    config={
-        "scrollZoom": False,    # Mobilde parmağın değdiği an zoom yapmasını engeller
-        "doubleClick": False,   # Ekrana iki kez dokununca haritanın fırlamasını engeller
-        "displaylogo": False,   # Mobilde ekrandaki gereksiz Plotly logosunu kaldırır
-    }
-)
+        fig,
+        use_container_width=True,
+        config={
+            "displayModeBar": False,
+            "scrollZoom": False,
+            "doubleClick": False,
+        }
+    )
 
 with col_hud:
     if mission_summary:
@@ -848,6 +831,25 @@ with tab2:
             )
 
 with tab3:
+    arch_diag = """```text
+[NASA JPL Mars Trek] ---> data_prep.py ---> processed/*.npz & sites.json
+  (.stl 3D Yüzey Ağı)     (Offline Mesh-to-Grid)     (Yükseklik, Eğim, Krater Derinliği)
+                                                                 │
+[Curiosity REMS/RAD]  ──┐                                        ▼
+[Perseverance MEDA ]  ──┼─> survival_model.py ───> Dinamik Maliyet Matrisi (Cost Grid)
+(Güneş Açısı / Termal)──┘   (Anlık Fizik Motoru)                 │
+                                                                 ▼
+                               pathfinder.py  <─── [A* Arama Algoritması]
+                               (Yol Planlayıcı)    - Eğim, Krater, Sıcaklık Cezaları
+                                     │             - Kör Rota Karşılaştırması
+                                     ▼
+                                   app.py     ---> [Streamlit Web HUD / Karar Destek]
+                                                   - 2D/3D Plotly Görselleştirme
+                                                   - Adım Adım Navigasyon Çıktısı
+                                                   - Failsafe Alternatif Rota Motoru
+```"""
+    st.markdown(f"### {'🏗️ System Architecture & Data Flow' if is_en else '🏗️ Sistem Mimarisi ve Veri Akışı'}\n{arch_diag}")
+
     if is_en:
         st.markdown(f"""
         ### Data Sources & Engineering Methodology ({meta['display_name']})
