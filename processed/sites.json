@@ -1,0 +1,76 @@
+{
+  "jezero": {
+    "display_name": "Jezero Krateri - Antik Delta (Perseverance MEDA)",
+    "grid_size": 200,
+    "area_size_m": 3000.0,
+    "cell_size_m": 15.0,
+    "relief_m": 191.3,
+    "lander": [
+      70,
+      70
+    ],
+    "targets": [
+      {
+        "id": "T1",
+        "name": "Antik Nehir Deltası Yelpazesi",
+        "description": "Mikrobiyal yaşam izleri barındırma ihtimali en yüksek ince taneli tortullar.",
+        "x": 58,
+        "y": 176,
+        "image_path": ""
+      },
+      {
+        "id": "T2",
+        "name": "Karbonat Kıyı Şeridi",
+        "description": "Eski göl kıyısında oluşmuş karbonat mineral birikintileri.",
+        "x": 171,
+        "y": 59,
+        "image_path": ""
+      },
+      {
+        "id": "T3",
+        "name": "Krater Kenarı Bazaltik Çıkıntı",
+        "description": "Volkanik geçmişi ve darbe kronolojisini aydınlatan kayaç yüzeyi.",
+        "x": 129,
+        "y": 102,
+        "image_path": ""
+      }
+    ]
+  },
+  "gale": {
+    "display_name": "Gale Krateri - Sharp Dağı (Curiosity REMS)",
+    "grid_size": 200,
+    "area_size_m": 3000.0,
+    "cell_size_m": 15.0,
+    "relief_m": 80.0,
+    "lander": [
+      70,
+      72
+    ],
+    "targets": [
+      {
+        "id": "T1",
+        "name": "Boxwork Sırt Formasyonu",
+        "description": "Curiosity'nin 2025'te incelediği, antik yeraltı sularının oluşturduğu mineral ağ yapıları.",
+        "x": 96,
+        "y": 108,
+        "image_path": ""
+      },
+      {
+        "id": "T2",
+        "name": "Kil-Sülfat Geçiş Zonu",
+        "description": "Eski göl tabanından kurak döneme geçişi gösteren katmanlı tortul kayaçlar.",
+        "x": 95,
+        "y": 158,
+        "image_path": ""
+      },
+      {
+        "id": "T3",
+        "name": "Krater Tabanı Çakıl Yatağı",
+        "description": "Akarsu aşınmasıyla taşınmış yuvarlak çakıllar ve su izleri.",
+        "x": 116,
+        "y": 49,
+        "image_path": ""
+      }
+    ]
+  }
+}
