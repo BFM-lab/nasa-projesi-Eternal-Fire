@@ -706,7 +706,15 @@ with col_map:
             margin=dict(l=5, r=5, t=35, b=5),
         )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={
+        "scrollZoom": False,    # Mobilde parmağın değdiği an zoom yapmasını engeller
+        "doubleClick": False,   # Ekrana iki kez dokununca haritanın fırlamasını engeller
+        "displaylogo": False,   # Mobilde ekrandaki gereksiz Plotly logosunu kaldırır
+    }
+)
 
 with col_hud:
     if mission_summary:
