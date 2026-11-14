@@ -94,3 +94,23 @@ Bu proje MIT Lisansı kapsamında açık kaynak olarak sunulmaktadır.
 
 ---
 
+## 🏗️ Sistem Mimarisi ve Veri Akışı
+
+```text
+[NASA JPL Mars Trek] ---> data_prep.py ---> processed/*.npz & sites.json
+  (.stl 3D Yüzey Ağı)     (Offline Mesh-to-Grid)     (Yükseklik, Eğim, Krater Derinliği)
+                                                                 │
+[Curiosity REMS/RAD]  ──┐                                        ▼
+[Perseverance MEDA ]  ──┼─> survival_model.py ───> Dinamik Maliyet Matrisi (Cost Grid)
+(Güneş Açısı / Termal)──┘   (Anlık Fizik Motoru)                 │
+                                                                 ▼
+                               pathfinder.py  <─── [A* Arama Algoritması]
+                               (Yol Planlayıcı)    - Eğim, Krater, Sıcaklık Cezaları
+                                     │             - Kör Rota Karşılaştırması
+                                     ▼
+                                   app.py     ---> [Streamlit Web HUD / Karar Destek]
+                                                   - 2D/3D Plotly Görselleştirme
+                                                   - Adım Adım Navigasyon Çıktısı
+                                                   - Failsafe Alternatif Rota Motoru
+---
+
